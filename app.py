@@ -128,30 +128,26 @@ class TranslateReq(BaseModel):
     target: str = "fr"
 
 
+from deep_translator import GoogleTranslator
+
 @app.post("/api/translate")
 def translate(body: TranslateReq):
     """
-    Par défaut: tente LibreTranslate en local (docker)
-    docker run -it -p 5000:5000 libretranslate/libretranslate
+    Utilise deep-translator (Google Translate) directement.
+    Plus besoin de Docker.
     """
     try:
-        r = requests.post(
-            "http://localhost:5000/translate",
-            json={
-                "q": body.q,
-                "source": body.source,
-                "target": body.target,
-                "format": "text"
-            },
-            timeout=15,
-        )
-        r.raise_for_status()
-        return r.json()
-    except Exception:
-        # Réponse claire si LibreTranslate n'est pas lancé
+        # deep-translator gère la plupart des exceptions
+        # source='de', target='fr' par défaut dans le modèle, mais on peut forcer 'auto'
+        translator = GoogleTranslator(source=body.source, target=body.target)
+        translation = translator.translate(body.q)
+        
+        return {"translatedText": translation}
+    except Exception as e:
+        print(f"Translation error: {e}")
         return JSONResponse(
-            status_code=200,
+            status_code=500,
             content={
-                "translatedText": "(LibreTranslate n'est pas lancé) Lance-le avec Docker, ou je peux te donner une alternative offline."
+                "translatedText": "Erreur de traduction (connexion internet requise)."
             },
         )

@@ -1,155 +1,77 @@
-# DeutschKurse – Interactive PDF Library (German Learning)
+# DeutschKurse – Interactive PDF Library
 
-DeutschKurse is a simple web application that organizes German learning PDFs into categories and provides an **interactive reading experience** directly in your browser.
+A modern, premium web application for learning German. Organize your PDF resources and interactive reading with built-in translation and text-to-speech.
 
-Browse PDFs by category  
-Open and read PDFs in a clean interface  
-Select a word/sentence → **Right click** → **Read aloud (German)** / **Translate (French)**  
-Works locally on Windows / Linux / macOS
+![UI Preview](https://placehold.co/800x400/050505/ffffff?text=Modern+Dark+UI)
 
----
+## ✨ Features
 
-## Project Structure
-
-Your folders should look like this:
-
-```
-
-DeutschKurse/
-app.py
-
-grammatik_wortschatz/
-German.pdf
-...
-
-leseverstaendnis/
-...
-
-pruefungen_tests/
-...
-
-templates/
-index.html
-viewer.html
-
-static/
-app.js
-pdf_viewer.js
-styles.css
-pdfjs/
-build/
-web/
-
-````
+- **📂 Organized Library**: Automatically scans categorized folders for PDFs.
+- **🎨 Premium Dark UI**: Stunning glassmorphism design with smooth animations.
+- **📄 Interactive PDF Viewer**: Custom PDF engine (PDF.js) for perfect rendering.
+- **🌍 Instant Translation**: Select text -> Right Click -> **Traduire (FR)**.
+- **🔊 Text-to-Speech**: Select text -> Right Click -> **Lire (DE)**.
+- **🚀 No Docker Required**: Uses `deep-translator` for instant, setup-free translations.
 
 ---
 
-## Categories (German)
+## 🛠️ Installation
 
-- **Grammatik und Wortschatz** → `grammatik_wortschatz/`
-- **Leseverständnis** → `leseverstaendnis/`
-- **Prüfungen und Tests** → `pruefungen_tests/`
+### 1. Prerequisites
+- Python 3.8+
+- Internet connection (for Google Translate API)
 
----
-
-## Features
-
-### PDF Library
-- Automatically scans all PDF files inside the folders
-- Displays PDFs in a clean homepage interface
-
-### Text-to-Speech (German)
-- Select text inside a PDF
-- Right click → **Lire (DE)**
-- Uses **Web Speech API** (free, built-in browser feature)
-
-### Translation (German → French)
-- Right click → **Traduire (FR)**
-- Uses **LibreTranslate** (optional / recommended)
-
----
-
-## Installation
-
-### 1) Create & activate a Python environment (recommended)
+### 2. Setup
 
 ```bash
+# Clone the repository
+git clone <your-repo-url>
+cd DeutschKurse
+
+# Create virtual environment (optional but recommended)
 python -m venv .venv
-````
 
-**Windows (PowerShell):**
+# Activate on Windows
+.venv\Scripts\Activate
 
-```bash
-.venv\Scripts\Activate.ps1
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-**Windows (cmd):**
-
-```bash
-.venv\Scripts\activate.bat
-```
-
-**macOS / Linux:**
-
-```bash
-source .venv/bin/activate
-```
-
----
-
-### 2) Install dependencies
-
-```bash
-pip install fastapi uvicorn jinja2 requests
-```
-
----
-
-## Run the app
-
-From the project root:
+## 🚀 Running the App
 
 ```bash
 python -m uvicorn app:app --reload
 ```
 
-Then open:
-
-[http://127.0.0.1:8000/](http://127.0.0.1:8000/)
+Then open your browser at **[http://localhost:8000](http://localhost:8000)**.
 
 ---
 
-## (Optional) Enable Translation with LibreTranslate
+## 📂 Project Structure
 
-If you want the **Translate (FR)** button to actually work, start LibreTranslate using Docker:
-
-```bash
-docker run -it -p 5000:5000 libretranslate/libretranslate
+```
+DeutschKurse/
+├── app.py                 # Backend (FastAPI)
+├── requirements.txt       # Dependencies
+├── static/                # Assets (CSS, JS, PDF.js)
+│   ├── styles.css         # Premium dark theme
+│   ├── app.js             # Logic for context menu & API
+│   └── pdfjs/             # PDF rendering engine
+├── templates/             # HTML Templates
+│   ├── index.html         # Library Home
+│   └── viewer.html        # Custom PDF Viewer
+└── (PDF Folders)
+    ├── grammatik_wortschatz
+    ├── leseverstaendnis
+    └── pruefungen_tests
 ```
 
-Then translation will work automatically inside the app.
-
-LibreTranslate runs locally (free)
-No Google API key required
-
----
-
-## Notes / Limitations
-
-* **Text selection works only if the PDF contains real text**
-  (scanned image PDFs will not allow text selection → OCR would be needed)
-
-* Text-to-speech quality depends on your browser/system voice
-  (Edge and Chrome on Windows usually work great)
-
----
-
-## Future Improvements (Ideas)
-
-* Search bar (filter PDFs by name)
-* Add OCR support for scanned PDFs
-* Save vocabulary list / flashcards
-* Dark/light mode toggle
-* Export selected text to a notebook
-
----
+## 💡 How to Use
+1. **Browse**: Click a category card to see your PDFs.
+2. **Read**: Click a PDF to open the viewer.
+3. **Interact**: 
+   - Highlight any German text.
+   - **Right-click** to open the custom menu.
+   - Choose **Translate** to see the French translation instantly.
+   - Choose **Read** to hear the pronunciation.

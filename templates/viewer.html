@@ -3,21 +3,169 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>{{ filename }}</title>
+  <title>{{ filename }} | Lecture</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+  
+  <!-- PDF.js Styles -->
+  <link rel="stylesheet" href="/static/pdfjs/web/pdf_viewer.css">
   <link rel="stylesheet" href="/static/styles.css">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
+  
+  <style>
+    /* Custom overrides for the viewer container */
+    #viewer-container {
+      position: absolute;
+      top: 58px; /* height of topbar */
+      left: 0;
+      right: 0;
+      bottom: 0;
+      overflow: auto;
+      background-color: #1a1a1a;
+      display: flex;
+      justify-content: center;
+    }
+    
+    #pdf-wrapper {
+        width: 100%;
+        max-width: 1000px;
+        position: relative;
+        padding: 20px 0;
+    }
+
+    .page {
+        margin: 0 auto 20px auto;
+        position: relative;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    
+    /* Ensure text layer matched canvas size */
+    .textLayer {
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        overflow: hidden;
+        opacity: 0.2;
+        line-height: 1.0;
+    }
+    
+    .rp-canvas {
+        display: block;
+    }
+  </style>
 </head>
 
 <body class="viewer-page">
   <div class="topbar">
-    <a class="btn" href="/">← Retour</a>
+    <a class="btn" href="/">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><path d="M19 12H5"></path><path d="M12 19l-7-7 7-7"></path></svg>
+      Retour
+    </a>
     <div class="topbar-title">
       <div class="muted">{{ title }}</div>
       <div class="filename">{{ filename }}</div>
     </div>
+    
+    <div style="margin-left:auto; display:flex; gap:10px">
+        <button id="zoom-out" class="btn">-</button>
+        <button id="zoom-in" class="btn">+</button>
+    </div>
   </div>
 
-  <iframe class="viewer-iframe" src="{{ pdf_url }}"></iframe>
+  <div id="viewer-container">
+    <div id="pdf-wrapper"></div>
+  </div>
 
+  <!-- Main App Logic -->
   <script src="/static/app.js"></script>
+  
+  <!-- PDF Rendering Logic -->
+  <script>
+    const url = "{{ pdf_url }}"; // The API URL provided by Jinja
+    let pdfDoc = null;
+    let pageNum = 1;
+    let scale = 1.2;
+    const wrapper = document.getElementById('pdf-wrapper');
+
+    async function renderPage(num) {
+      const page = await pdfDoc.getPage(num);
+      const viewport = page.getViewport({ scale });
+      
+      // Create page container
+      const div = document.createElement("div");
+      div.className = "page";
+      div.style.width = Math.floor(viewport.width) + "px";
+      div.style.height = Math.floor(viewport.height) + "px";
+      div.style.position = "relative"; // vital for textLayer
+      
+      // Canvas
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext('2d');
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      canvas.className = "rp-canvas";
+      
+      div.appendChild(canvas);
+      
+      // Render PDF to canvas
+      const renderContext = {
+        canvasContext: ctx,
+        viewport: viewport
+      };
+      await page.render(renderContext).promise;
+      
+      // Text Layer
+      const textLayerDiv = document.createElement("div");
+      textLayerDiv.className = "textLayer";
+      textLayerDiv.style.width = Math.floor(viewport.width) + "px";
+      textLayerDiv.style.height = Math.floor(viewport.height) + "px";
+      div.appendChild(textLayerDiv);
+      
+      const textContent = await page.getTextContent();
+      pdfjsLib.renderTextLayer({
+        textContentSource: textContent,
+        container: textLayerDiv,
+        viewport: viewport,
+        textDivs: []
+      });
+
+      wrapper.appendChild(div);
+      
+      // Move to next page
+      if (pageNum < pdfDoc.numPages) {
+        pageNum++;
+        renderPage(pageNum);
+      }
+    }
+
+    // Load PDF
+    pdfjsLib.getDocument(url).promise.then(doc => {
+      pdfDoc = doc;
+      renderPage(1);
+    });
+    
+    document.getElementById('zoom-in').onclick = () => {
+        scale += 0.2;
+        wrapper.innerHTML = "";
+        pageNum = 1;
+        renderPage(1);
+    };
+    
+    document.getElementById('zoom-out').onclick = () => {
+        scale = Math.max(0.5, scale - 0.2);
+        wrapper.innerHTML = "";
+        pageNum = 1;
+        renderPage(1);
+    };
+  </script>
 </body>
 </html>

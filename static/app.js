@@ -12,34 +12,57 @@
 
     menu = document.createElement("div");
     menu.id = "ytx-menu";
-    menu.style.position = "fixed";
-    menu.style.zIndex = "999999";
-    menu.style.minWidth = "220px";
-    menu.style.background = "#0f1117";
-    menu.style.border = "1px solid #2a3445";
-    menu.style.borderRadius = "12px";
-    menu.style.padding = "10px";
-    menu.style.display = "none";
-    menu.style.boxShadow = "0 10px 30px rgba(0,0,0,0.45)";
-    menu.style.color = "#e6e6e6";
-    menu.style.fontFamily = "system-ui, Arial, sans-serif";
+    
+    // Style injected via JS, but ideally should be in CSS class "context-menu"
+    // mixing inline for safety with logic
+    Object.assign(menu.style, {
+      position: "fixed",
+      zIndex: "999999",
+      minWidth: "260px",
+      background: "rgba(10, 10, 10, 0.95)",
+      backdropFilter: "blur(12px)",
+      border: "1px solid rgba(255, 255, 255, 0.1)",
+      borderRadius: "12px",
+      padding: "16px",
+      display: "none",
+      boxShadow: "0 20px 40px rgba(0,0,0,0.6)",
+      color: "#fff",
+      fontFamily: "'Inter', sans-serif",
+      fontSize: "14px"
+    });
 
     menu.innerHTML = `
-      <div style="font-size:12px;color:#a8b3cf;margin-bottom:8px">Texte sélectionné</div>
-      <div id="ytx-text" style="font-size:13px;line-height:1.35;max-height:90px;overflow:auto;margin-bottom:10px"></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button id="ytx-speak" style="padding:8px 10px;border-radius:10px;border:1px solid #2a3445;background:#161a22;color:#e6e6e6;cursor:pointer">🔊 Lire (DE)</button>
-        <button id="ytx-translate" style="padding:8px 10px;border-radius:10px;border:1px solid #2a3445;background:#161a22;color:#e6e6e6;cursor:pointer">🌍 Traduire (FR)</button>
-        <button id="ytx-close" style="margin-left:auto;padding:8px 10px;border-radius:10px;border:1px solid #2a3445;background:#161a22;color:#e6e6e6;cursor:pointer">✖</button>
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:#60a5fa; margin-bottom:8px; font-weight:600">Texte sélectionné</div>
+      <div id="ytx-text" style="font-size:13px; line-height:1.5; color:#e5e5e5; max-height:100px; overflow-y:auto; margin-bottom:16px; padding:8px; background:rgba(255,255,255,0.05); border-radius:6px;"></div>
+      
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+        <button id="ytx-speak" style="display:flex; align-items:center; justify-content:center; gap:6px; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); color:#fff; cursor:pointer; font-size:13px; transition:all 0.2s;">
+          <span>🔊</span> Lire
+        </button>
+        <button id="ytx-translate" style="display:flex; align-items:center; justify-content:center; gap:6px; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:#3b82f6; color:#fff; cursor:pointer; font-size:13px; font-weight:500; transition:all 0.2s;">
+          <span>🌍</span> Traduire
+        </button>
       </div>
-      <div id="ytx-result" style="margin-top:10px;font-size:13px;color:#c7d2f0;display:none"></div>
+      
+      <button id="ytx-close" style="position:absolute; top:12px; right:12px; background:none; border:none; color:#a3a3a3; cursor:pointer; padding:4px;">✖</button>
+      
+      <div id="ytx-result" style="margin-top:16px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.1); font-size:13px; color:#fff; display:none; line-height:1.5;"></div>
     `;
 
     document.body.appendChild(menu);
 
+    // Hover effects via JS for inline styles (optional but nice)
+    const btnTranslate = document.getElementById("ytx-translate");
+    btnTranslate.onmouseenter = () => btnTranslate.style.background = "#2563eb";
+    btnTranslate.onmouseleave = () => btnTranslate.style.background = "#3b82f6";
+    
+    const btnSpeak = document.getElementById("ytx-speak");
+    btnSpeak.onmouseenter = () => btnSpeak.style.background = "rgba(255,255,255,0.1)";
+    btnSpeak.onmouseleave = () => btnSpeak.style.background = "rgba(255,255,255,0.05)";
+
     // close handlers
     document.getElementById("ytx-close").onclick = hideMenu;
-    document.addEventListener("click", (e) => {
+    document.addEventListener("mousedown", (e) => {
       const m = document.getElementById("ytx-menu");
       if (!m) return;
       if (m.style.display === "none") return;
@@ -68,10 +91,23 @@
     res.textContent = "";
 
     // position
-    const padding = 12;
+    const padding = 16;
     menu.style.display = "block";
-    menu.style.left = Math.min(x + padding, window.innerWidth - 260) + "px";
-    menu.style.top = Math.min(y + padding, window.innerHeight - 200) + "px";
+    
+    // Smart positioning to avoid overflow
+    let left = x + padding;
+    let top = y + padding;
+    
+    if (left + 280 > window.innerWidth) {
+      left = x - 280 - padding;
+    }
+    
+    if (top + 300 > window.innerHeight) {
+      top = y - 300 - padding;
+    }
+    
+    menu.style.left = Math.max(10, left) + "px";
+    menu.style.top = Math.max(10, top) + "px";
   }
 
   function hideMenu() {
@@ -108,7 +144,7 @@
 
     const resBox = document.getElementById("ytx-result");
     resBox.style.display = "block";
-    resBox.textContent = "Traduction en cours...";
+    resBox.innerHTML = '<span style="color:#a3a3a3">Traduction en cours...</span>';
 
     try {
       const r = await fetch("/api/translate", {

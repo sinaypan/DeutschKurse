@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Bibliothèque PDF – Deutsch</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="header">
+    <h1>Bibliothèque PDF – Deutsch</h1>
+    <p>Sélectionne un PDF. Dans le lecteur : sélection de texte → clic droit → Lire / Traduire.</p>
+  </header>
+
+  <main class="container">
+    {% for cat in categories %}
+      <section class="card">
+        <h2>{{ cat.title }}</h2>
+
+        {% if cat.groups|length == 0 %}
+          <p class="muted">Aucun PDF trouvé dans ce dossier.</p>
+        {% else %}
+          {% for grp in cat.groups %}
+            <div class="group">
+              <h3>{{ grp.folder }}</h3>
+              <ul class="list">
+                {% for item in grp.pdfs %}
+                  <li>
+                    <a class="pdf-link" href="{{ item.view_url }}">{{ item.name }}</a>
+                    <span class="path">({{ item.rel }})</span>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endfor %}
+        {% endif %}
+      </section>
+    {% endfor %}
+  </main>
+</body>
+</html>

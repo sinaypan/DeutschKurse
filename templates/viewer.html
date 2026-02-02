@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{ filename }}</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+
+<body class="viewer-page">
+  <div class="topbar">
+    <a class="btn" href="/">← Retour</a>
+    <div class="topbar-title">
+      <div class="muted">{{ title }}</div>
+      <div class="filename">{{ filename }}</div>
+    </div>
+  </div>
+
+  <iframe class="viewer-iframe" src="{{ pdf_url }}"></iframe>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

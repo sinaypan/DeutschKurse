@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mon Vocabulaire</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    .vocab-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .vocab-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 20px;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .vocab-card:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(99, 102, 241, 0.4);
+      transform: translateY(-2px);
+    }
+    
+    .term {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    
+    .translation {
+      font-size: 1rem;
+      color: #94a3b8;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      padding-top: 12px;
+    }
+    
+    .date-added {
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-top: auto;
+    }
+    
+    .delete-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: none;
+      border: none;
+      color: #475569;
+      cursor: pointer;
+      opacity: 0;
+      transition: all 0.2s;
+    }
+    
+    .vocab-card:hover .delete-btn {
+      opacity: 1;
+    }
+    
+    .delete-btn:hover {
+      color: #ef4444;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px;
+        color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+      <div class="logo">DeutschKurse <span style="font-weight:400; color:rgba(255,255,255,0.5)">| Vocabulaire</span></div>
+      <a href="/" class="search-box" style="width:auto; padding: 8px 16px; text-decoration:none; color:white; justify-content:center;">
+        🏠 Retour
+      </a>
+  </div>
+
+  <div class="vocab-grid" id="grid">
+    <!-- Populated by JS -->
+    <div class="empty-state">Chargement...</div>
+  </div>
+
+  <script>
+    async function loadVocab() {
+        const res = await fetch('/api/vocab');
+        const data = await res.json();
+        const grid = document.getElementById('grid');
+        
+        if (data.length === 0) {
+            grid.innerHTML = '<div class="empty-state">Aucun mot enregistré pour le moment. <br> Sélectionnez du texte dans un PDF pour l\'ajouter !</div>';
+            return;
+        }
+        
+        grid.innerHTML = data.map(item => `
+            <div class="vocab-card" id="card-${item.id}">
+                <button class="delete-btn" onclick="deleteItem(${item.id})">✖</button>
+                <div class="term">${item.original}</div>
+                <div class="translation">${item.translation}</div>
+                <div class="date-added">Ajouté le ${new Date(item.added_at).toLocaleDateString()}</div>
+                <button onclick="speak('${item.original}')" style="background:none; border:none; color:#3b82f6; cursor:pointer; text-align:left; padding:0; margin-top:4px; font-size:12px;">🔊 Écouter</button>
+            </div>
+        `).join('');
+    }
+    
+    async function deleteItem(id) {
+        if(!confirm('Supprimer ce mot ?')) return;
+        await fetch(`/api/vocab/${id}`, { method: 'DELETE' });
+        document.getElementById(`card-${id}`).remove();
+    }
+    
+    function speak(text) {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = "de-DE";
+        window.speechSynthesis.speak(u);
+    }
+    
+    loadVocab();
+  </script>
+</body>
+</html>

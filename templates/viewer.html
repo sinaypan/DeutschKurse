@@ -10,19 +10,18 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
   
-  <!-- PDF.js Standard Styles REMOVED to avoid 'scale-factor' conflicts -->
-  <!-- We rely on our isolated manual styles below -->
+  <!-- PDF.js Standard Styles -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
   
   <style>
     /* 
      * ISOLATED STYLES
-     * We do NOT import styles.css to avoid 'box-sizing: border-box' messing up PDF.js 
      */
     
     body {
       margin: 0;
       padding: 0;
-      background-color: #1a1a1a; /* Dark background */
+      background-color: #1a1a1a; 
       font-family: 'Inter', sans-serif;
       height: 100vh;
       display: flex;
@@ -41,7 +40,7 @@
       color: white;
       z-index: 10;
       flex-shrink: 0;
-      box-sizing: border-box; /* Safe to use here */
+      box-sizing: border-box; 
     }
 
     .btn {
@@ -104,7 +103,6 @@
 
     #pdf-wrapper {
       padding: 24px 0;
-      /* PDF.js pages are block elements, this centers them horizontally if they are smaller than screen */
     }
 
     /* Page Styles Overrides */
@@ -114,7 +112,7 @@
       background-clip: content-box !important;
       box-shadow: 0 4px 10px rgba(0,0,0,0.5);
       border: none !important;
-      overflow: hidden; /* Ensure content stays within bounds */
+      overflow: hidden; 
     }
 
     .rp-canvas {
@@ -125,7 +123,6 @@
 
     /* 
      * CRITICAL TEXT LAYER FIXES 
-     * Forcing content-box and precise alignment
      */
     .textLayer, .textLayer > span {
         box-sizing: content-box !important;
@@ -147,19 +144,7 @@
         z-index: 5;
     }
 
-    /* Invisible text, allow selection */
-    .textLayer > span {
-        color: transparent;
-        position: absolute;
-        white-space: pre;
-        cursor: text;
-        transform-origin: 0% 0%;
-        margin: 0;
-        padding: 0;
-        border: none;
-    }
-
-    /* Selection Highlighting */
+    /* Keep our custom highlight color */
     ::selection {
         background: rgba(59, 130, 246, 0.4);
         color: transparent;
@@ -167,6 +152,16 @@
     .textLayer ::selection {
         background: rgba(59, 130, 246, 0.4);
         color: transparent; 
+    }
+
+    /* CSS for Eraser Mode */
+    .pdfViewer.eraser-mode .annotationLayer {
+        z-index: 10 !important; /* Bring above TextLayer (5) */
+        cursor: crosshair;
+    }
+    .pdfViewer.eraser-mode .annotationLayer > div {
+            cursor: cell !important; /* Visual cue */
+            border: 1px dashed red;  /* Visual cue */
     }
   </style>
 
@@ -188,6 +183,9 @@
       <div class="doc-title">{{ title }}</div>
     </div>
     <div class="controls">
+      <button class="btn" id="eraserBtn" onclick="toggleEraser()" title="Mode Gomme: Cliquer pour supprimer des surlignages">
+        🧹 Gomme: OFF
+      </button>
       <button id="zoom-out" class="btn">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
       </button>
@@ -206,6 +204,32 @@
 
   <script>
     const url = "{{ pdf_url }}";
+
+    // Eraser Mode Logic
+    let isEraserMode = false;
+    function toggleEraser() {
+        isEraserMode = !isEraserMode;
+        const btn = document.getElementById("eraserBtn");
+        // We need to target the container that holds pages with class 'pdfViewer'
+        // In our case wrapper holds pages directly, or does it?
+        // Let's add class 'pdfViewer' to wrapper or use wrapper directly.
+        // Actually, we can just toggle class on body or wrapper.
+        // The CSS rule above uses .pdfViewer.eraser-mode
+        // Let's rely on wrapper having that class or adding it.
+        const wrapper = document.getElementById('pdf-wrapper');
+        
+        if (isEraserMode) {
+            btn.style.background = "#fca5a5"; // Red color
+            btn.style.color = "#000";
+            btn.textContent = "🧹 Gomme: ON";
+            wrapper.classList.add("pdfViewer", "eraser-mode");
+        } else {
+            btn.style.background = "";
+            btn.style.color = "";
+            btn.textContent = "🧹 Gomme: OFF";
+            wrapper.classList.remove("eraser-mode");
+        }
+    }
     let pdfDoc = null;
     let scale = 1.0;
     let isFitToWidth = true;
@@ -213,16 +237,13 @@
     const container = document.getElementById('viewer-container');
     const wrapper = document.getElementById('pdf-wrapper');
 
-    // 1. Calculate Scale
     function getFitWidthScale(viewportWidth) {
       if (!viewportWidth) return 1.0;
-      // Subtract scrollbar approx (20px) and padding (32px)
       const available = container.clientWidth - 50; 
       const s = available / viewportWidth;
       return s > 0 ? s : 1.0;
     }
 
-    // 2. Intersection Observer (Lazy Load)
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
@@ -230,25 +251,177 @@
           if (!div.dataset.rendered) {
             renderPageContent(div);
           }
+          // Update current page for progress
+          currentPage = parseInt(div.dataset.pageNum);
+          saveMyProgress();
         }
       });
     }, {
       root: container,
-      rootMargin: "500px" // Render well ahead
+      rootMargin: "500px"
     });
 
-    // 3. Initial Setup
+    let currentPage = 1;
+    let saveTimeout;
+
+    function saveMyProgress() {
+        if (saveTimeout) clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+            const scrollTop = container.scrollTop;
+            fetch('/api/progress', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filename: "{{ filename }}", // Jinja template var
+                    page_num: currentPage,
+                    scroll_top: scrollTop
+                })
+            });
+        }, 1000); // Save after 1 second of inactivity
+    }
+    
+    // Resume
+    async function restoreProgress() {
+        try {
+            const res = await fetch(`/api/progress/{{ filename }}`);
+            const data = await res.json();
+            if (data && data.scroll_top) {
+                console.log("Restoring progress:", data);
+                // Ensure layout is ready
+                setTimeout(() => {
+                    container.scrollTop = data.scroll_top;
+                }, 100);
+            }
+        } catch(e) { console.error("Progress restore failed", e); }
+    }
+
+    // State for annotations
+    let documentAnnotations = [];
+
+    // Load annotations from server
+    async function loadAnnotations() {
+        try {
+            const res = await fetch(`/api/annotations/{{ filename }}`);
+            documentAnnotations = await res.json();
+            console.log("Loaded annotations:", documentAnnotations.length);
+        } catch(e) { console.error(e); }
+    }
+
+    // Listen for new from app.js context menu
+    window.addEventListener('annotation-added', async (e) => {
+        const { pageNum, rects, color } = e.detail;
+        
+        // Optimistic UI update (temporary, no ID)
+        const pageDiv = document.querySelector(`.page[data-page-num="${pageNum}"]`);
+        
+        // Save to backend
+        try {
+            const hRes = await fetch('/api/annotations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filename: "{{ filename }}",
+                    page_num: pageNum,
+                    rects: rects,
+                    color: color
+                })
+            });
+            const hData = await hRes.json();
+            
+            // Reload annotations to get the real object with ID
+            await loadAnnotations(); 
+            
+            // Re-render this page with the REAL ID
+            if (pageDiv) {
+                 const pageAnns = documentAnnotations.filter(a => a.page_num === pageNum);
+                 renderHighlightsForPage(pageDiv, pageAnns);
+            }
+            
+        } catch(err) { 
+            console.error(err);
+            alert("Erreur sauvegarde highlight"); 
+        }
+    });
+
+    function renderHighlightsForPage(div, anns) {
+        // Create or get annotation layer
+        let layer = div.querySelector('.annotationLayer');
+        if (!layer) {
+            layer = document.createElement('div');
+            layer.className = 'annotationLayer';
+            layer.style.position = 'absolute';
+            layer.style.top = '0';
+            layer.style.left = '0';
+            layer.style.width = '100%';
+            layer.style.height = '100%';
+            layer.style.pointerEvents = 'none'; // Allow clicking mostly through
+            layer.style.zIndex = '4'; 
+            div.appendChild(layer);
+        }
+        
+        // Remove old ones to avoid duplicates if re-rendering? 
+        // Ideally we differentiate by ID, but clearing is safer for now.
+        layer.innerHTML = "";
+        
+        const scaleFactor = parseFloat(div.style.getPropertyValue('--scale-factor')) || 1.0;
+
+        anns.forEach(ann => {
+            ann.rects.forEach(r => {
+                const el = document.createElement('div');
+                el.style.position = 'absolute';
+                el.style.left = (r.x * scaleFactor) + 'px';
+                el.style.top = (r.y * scaleFactor) + 'px';
+                el.style.width = (r.w * scaleFactor) + 'px';
+                el.style.height = (r.h * scaleFactor) + 'px';
+                
+                el.style.backgroundColor = ann.color;
+                el.style.opacity = '0.4'; 
+                el.style.mixBlendMode = 'multiply';
+                
+                el.style.pointerEvents = 'auto'; // Catch clicks on the highlight itself
+                el.style.cursor = 'pointer'; // Show it's clickable
+                el.title = "Cliquez pour supprimer";
+                
+                // Add Delete Handler
+                // Note: 'ann.id' might be undefined for optimistic updates until reload
+                if (ann.id) {
+                    el.onclick = (e) => {
+                        e.stopPropagation(); // Prevent other interactions
+                        if(confirm("Supprimer ce surlignage ?")) {
+                            deleteAnnotation(ann.id);
+                        }
+                    };
+                }
+                
+                layer.appendChild(el);
+            });
+        });
+    }
+
+    async function deleteAnnotation(id) {
+        try {
+            await fetch(`/api/annotations/${id}`, { method: 'DELETE' });
+            // Reload all to reflect changes
+            loadAnnotations().then(() => {
+                // Force re-render of visible pages
+                document.querySelectorAll('.page[data-rendered="true"]').forEach(div => {
+                     const num = parseInt(div.dataset.pageNum);
+                     const pageAnns = documentAnnotations.filter(a => a.page_num === num);
+                     renderHighlightsForPage(div, pageAnns);
+                });
+            });
+        } catch(e) { alert("Erreur suppression"); }
+    }
+
     async function init() {
       try {
+        await loadAnnotations(); // Preload
+
         pdfDoc = await pdfjsLib.getDocument(url).promise;
-        
-        // Save scroll ratio
-        const prevScroll = container.scrollTop > 0 ? container.scrollTop / container.scrollHeight : 0;
-        
+        // ... rest of init
         wrapper.innerHTML = "";
         observer.disconnect();
 
-        // Get first page to find aspect ratio / size
         const p1 = await pdfDoc.getPage(1);
         const v1 = p1.getViewport({scale: 1.0});
 
@@ -256,43 +429,27 @@
           scale = getFitWidthScale(v1.width);
         }
 
-        // Create placeholders
         for (let i = 1; i <= pdfDoc.numPages; i++) {
-          // Use P1 dimensions as rough estimate for all (performance)
-          // or fetch each page (better accuracy, slower setup).
-          // For speed/scrolling, we'll assume uniform size for now, 
-          // or we can fetch page dimensions in parallel if needed.
-          // Let's rely on v1 for placeholder size to be instant.
-          // Actually, let's just use v1 dimensions scaled.
-          
-          // NOTE: If mixed landscape/portrait, this is wrong. 
-          // But it's reliable for lazy loading shell.
-          // Let's fetch each page index just for dimension? No, too slow.
-          
           const viewport = v1.clone({scale: scale});
           
           const div = document.createElement("div");
           div.className = "page";
           div.dataset.pageNum = i;
-          div.style.width = Math.floor(viewport.width) + "px";
-          div.style.height = Math.floor(viewport.height) + "px";
+          div.style.width = viewport.width + "px";
+          div.style.height = viewport.height + "px";
+          div.style.setProperty('--scale-factor', viewport.scale);
           
           wrapper.appendChild(div);
           observer.observe(div);
         }
+        
+        await restoreProgress();
 
-        // Restore scroll
-        if (prevScroll > 0) {
-           setTimeout(() => {
-             container.scrollTop = prevScroll * container.scrollHeight;
-           }, 50);
-        }
-      } catch (e) {
-        console.error(e);
-      }
+      } catch (e) { console.error(e); }
     }
+    
+    // ... event listeners ...
 
-    // 4. Render Content
     async function renderPageContent(div) {
       div.dataset.rendered = "true";
       const num = parseInt(div.dataset.pageNum);
@@ -300,21 +457,41 @@
       const page = await pdfDoc.getPage(num);
       const viewport = page.getViewport({scale: scale});
       
-      // Update div size if page size differs from P1 assumption
-      div.style.width = Math.floor(viewport.width) + "px";
-      div.style.height = Math.floor(viewport.height) + "px";
+      div.style.width = viewport.width + "px";
+      div.style.height = viewport.height + "px";
+      div.style.setProperty('--scale-factor', viewport.scale);
 
-      // Canvas
+      // Canvas ...
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext('2d');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
+      const outputScale = window.devicePixelRatio || 1;
+      
+      canvas.width = Math.floor(viewport.width * outputScale);
+      canvas.height = Math.floor(viewport.height * outputScale);
+      canvas.style.width = viewport.width + "px";
+      canvas.style.height = viewport.height + "px";
+      canvas.className = "rp-canvas";
+      
       div.appendChild(canvas);
 
-      const renderCtx = { canvasContext: ctx, viewport: viewport };
+      const transform = outputScale !== 1 
+        ? [outputScale, 0, 0, outputScale, 0, 0] 
+        : null;
+
+      const renderCtx = { 
+          canvasContext: ctx, 
+          viewport: viewport,
+          transform: transform 
+      };
       await page.render(renderCtx).promise;
 
-      // Text Layer
+      // Render Annotations BEFORE Text Layer (z-index handled)
+      const pageAnns = documentAnnotations.filter(a => a.page_num === num);
+      if (pageAnns.length > 0) {
+          renderHighlightsForPage(div, pageAnns);
+      }
+
+      // Text Layer ...
       const textDiv = document.createElement("div");
       textDiv.className = "textLayer";
       div.appendChild(textDiv);
@@ -328,7 +505,7 @@
       });
     }
 
-    // 5. Controls
+    // Controls
     document.getElementById('zoom-in').onclick = () => {
       isFitToWidth = false;
       scale *= 1.2;

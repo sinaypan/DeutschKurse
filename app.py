@@ -7,7 +7,13 @@ from pathlib import Path
 import urllib.parse
 import requests
 
+import database
+
 app = FastAPI()
+
+@app.on_event("startup")
+def startup_event():
+    database.init_db()
 
 BASE_DIR = Path(__file__).parent
 
@@ -120,6 +126,10 @@ def view_pdf(request: Request, cat_slug: str, pdf_relpath: str):
         }
     )
 
+@app.get("/vocab", response_class=HTMLResponse)
+def view_vocabulary(request: Request):
+    return templates.TemplateResponse("vocabulary.html", {"request": request})
+
 
 
 class TranslateReq(BaseModel):
@@ -151,3 +161,67 @@ def translate(body: TranslateReq):
                 "translatedText": "Erreur de traduction (connexion internet requise)."
             },
         )
+
+# -- Vocabulary API --
+
+class VocabItem(BaseModel):
+    original: str
+    translation: str
+    context: str = ""
+
+@app.get("/api/vocab")
+def get_vocabulary():
+    return database.get_vocab()
+
+@app.post("/api/vocab")
+def add_vocabulary(item: VocabItem):
+    # Check if duplicate? For now, allowing duplicates or simple inserts
+    new_id = database.add_vocab(item.original, item.translation, item.context)
+    return {"id": new_id, "status": "added"}
+
+@app.delete("/api/vocab/{vocab_id}")
+def delete_vocabulary(vocab_id: int):
+    database.delete_vocab(vocab_id)
+    return {"status": "deleted"}
+
+# -- Progress API --
+
+class ProgressItem(BaseModel):
+    filename: str
+    page_num: int
+    scroll_top: int
+
+@app.get("/api/progress/{filename:path}")
+def get_progress(filename: str):
+    prog = database.get_progress(filename)
+    return prog if prog else {}
+
+@app.post("/api/progress")
+def save_progress(item: ProgressItem):
+    database.save_progress(item.filename, item.page_num, item.scroll_top)
+    return {"status": "saved"}
+
+# -- Annotation API --
+
+class AnnotationItem(BaseModel):
+    filename: str
+    page_num: int
+    rects: list
+    color: str
+    note: str = ""
+
+@app.get("/api/annotations/{filename:path}")
+def get_annotations(filename: str):
+    return database.get_annotations(filename)
+
+@app.post("/api/annotations")
+def add_annotation(item: AnnotationItem):
+    # Pass dict or list to database, handled by helper
+    import json
+    new_id = database.add_annotation(item.filename, item.page_num, json.dumps(item.rects), item.color, item.note)
+    return {"id": new_id, "status": "added"}
+
+@app.delete("/api/annotations/{ann_id}")
+def delete_annotation(ann_id: int):
+    database.delete_annotation(ann_id)
+    return {"status": "deleted"}

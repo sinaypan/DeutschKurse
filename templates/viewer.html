@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
   <title>{{ filename }} | Lecture</title>
   
   <!-- Fonts -->
@@ -10,74 +10,190 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
   
-  <!-- PDF.js Styles -->
-  <link rel="stylesheet" href="/static/pdfjs/web/pdf_viewer.css">
-  <link rel="stylesheet" href="/static/styles.css">
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  </script>
+  <!-- PDF.js Standard Styles REMOVED to avoid 'scale-factor' conflicts -->
+  <!-- We rely on our isolated manual styles below -->
   
   <style>
-    /* Custom overrides for the viewer container */
+    /* 
+     * ISOLATED STYLES
+     * We do NOT import styles.css to avoid 'box-sizing: border-box' messing up PDF.js 
+     */
+    
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #1a1a1a; /* Dark background */
+      font-family: 'Inter', sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Topbar Styling */
+    .topbar {
+      height: 56px;
+      background: rgba(10, 10, 10, 0.95);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      color: white;
+      z-index: 10;
+      flex-shrink: 0;
+      box-sizing: border-box; /* Safe to use here */
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      color: #e5e5e5;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.2s;
+      border: 1px solid transparent;
+      box-sizing: border-box;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+
+    .title-area {
+      margin-left: 16px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+    }
+    .file-name {
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .doc-title {
+      font-size: 11px;
+      color: #a3a3a3;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* PDF Container */
     #viewer-container {
-      position: absolute;
-      top: 58px; /* height of topbar */
-      left: 0;
-      right: 0;
-      bottom: 0;
+      flex: 1;
       overflow: auto;
+      position: relative;
+      width: 100%;
       background-color: #1a1a1a;
       display: flex;
       justify-content: center;
     }
-    
+
     #pdf-wrapper {
-        width: 100%;
-        max-width: 1000px;
-        position: relative;
-        padding: 20px 0;
+      padding: 24px 0;
+      /* PDF.js pages are block elements, this centers them horizontally if they are smaller than screen */
     }
 
+    /* Page Styles Overrides */
     .page {
-        margin: 0 auto 20px auto;
-        position: relative;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      margin: 0 auto 16px auto !important;
+      position: relative;
+      background-clip: content-box !important;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      border: none !important;
+      overflow: hidden; /* Ensure content stays within bounds */
+    }
+
+    .rp-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+    }
+
+    /* 
+     * CRITICAL TEXT LAYER FIXES 
+     * Forcing content-box and precise alignment
+     */
+    .textLayer, .textLayer > span {
+        box-sizing: content-box !important;
     }
     
-    /* Ensure text layer matched canvas size */
     .textLayer {
-        position: absolute;
+        position: absolute !important;
         left: 0;
         top: 0;
         right: 0;
         bottom: 0;
+        width: 100%;
+        height: 100%;
         overflow: hidden;
-        opacity: 0.2;
+        opacity: 1 !important;
+        mix-blend-mode: normal;
         line-height: 1.0;
+        transform-origin: 0 0;
+        z-index: 5;
     }
-    
-    .rp-canvas {
-        display: block;
+
+    /* Invisible text, allow selection */
+    .textLayer > span {
+        color: transparent;
+        position: absolute;
+        white-space: pre;
+        cursor: text;
+        transform-origin: 0% 0%;
+        margin: 0;
+        padding: 0;
+        border: none;
+    }
+
+    /* Selection Highlighting */
+    ::selection {
+        background: rgba(59, 130, 246, 0.4);
+        color: transparent;
+    }
+    .textLayer ::selection {
+        background: rgba(59, 130, 246, 0.4);
+        color: transparent; 
     }
   </style>
+
+  <!-- PDF.js Scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
 </head>
 
-<body class="viewer-page">
+<body>
   <div class="topbar">
-    <a class="btn" href="/">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><path d="M19 12H5"></path><path d="M12 19l-7-7 7-7"></path></svg>
+    <a href="/" class="btn">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
       Retour
     </a>
-    <div class="topbar-title">
-      <div class="muted">{{ title }}</div>
-      <div class="filename">{{ filename }}</div>
+    <div class="title-area">
+      <div class="file-name">{{ filename }}</div>
+      <div class="doc-title">{{ title }}</div>
     </div>
-    
-    <div style="margin-left:auto; display:flex; gap:10px">
-        <button id="zoom-out" class="btn">-</button>
-        <button id="zoom-in" class="btn">+</button>
+    <div class="controls">
+      <button id="zoom-out" class="btn">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
+      </button>
+      <button id="zoom-in" class="btn">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
     </div>
   </div>
 
@@ -85,87 +201,156 @@
     <div id="pdf-wrapper"></div>
   </div>
 
-  <!-- Main App Logic -->
+  <!-- App Context Menu Logic -->
   <script src="/static/app.js"></script>
-  
-  <!-- PDF Rendering Logic -->
+
   <script>
-    const url = "{{ pdf_url }}"; // The API URL provided by Jinja
+    const url = "{{ pdf_url }}";
     let pdfDoc = null;
-    let pageNum = 1;
-    let scale = 1.2;
+    let scale = 1.0;
+    let isFitToWidth = true;
+    
+    const container = document.getElementById('viewer-container');
     const wrapper = document.getElementById('pdf-wrapper');
 
-    async function renderPage(num) {
-      const page = await pdfDoc.getPage(num);
-      const viewport = page.getViewport({ scale });
+    // 1. Calculate Scale
+    function getFitWidthScale(viewportWidth) {
+      if (!viewportWidth) return 1.0;
+      // Subtract scrollbar approx (20px) and padding (32px)
+      const available = container.clientWidth - 50; 
+      const s = available / viewportWidth;
+      return s > 0 ? s : 1.0;
+    }
+
+    // 2. Intersection Observer (Lazy Load)
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const div = entry.target;
+          if (!div.dataset.rendered) {
+            renderPageContent(div);
+          }
+        }
+      });
+    }, {
+      root: container,
+      rootMargin: "500px" // Render well ahead
+    });
+
+    // 3. Initial Setup
+    async function init() {
+      try {
+        pdfDoc = await pdfjsLib.getDocument(url).promise;
+        
+        // Save scroll ratio
+        const prevScroll = container.scrollTop > 0 ? container.scrollTop / container.scrollHeight : 0;
+        
+        wrapper.innerHTML = "";
+        observer.disconnect();
+
+        // Get first page to find aspect ratio / size
+        const p1 = await pdfDoc.getPage(1);
+        const v1 = p1.getViewport({scale: 1.0});
+
+        if (isFitToWidth) {
+          scale = getFitWidthScale(v1.width);
+        }
+
+        // Create placeholders
+        for (let i = 1; i <= pdfDoc.numPages; i++) {
+          // Use P1 dimensions as rough estimate for all (performance)
+          // or fetch each page (better accuracy, slower setup).
+          // For speed/scrolling, we'll assume uniform size for now, 
+          // or we can fetch page dimensions in parallel if needed.
+          // Let's rely on v1 for placeholder size to be instant.
+          // Actually, let's just use v1 dimensions scaled.
+          
+          // NOTE: If mixed landscape/portrait, this is wrong. 
+          // But it's reliable for lazy loading shell.
+          // Let's fetch each page index just for dimension? No, too slow.
+          
+          const viewport = v1.clone({scale: scale});
+          
+          const div = document.createElement("div");
+          div.className = "page";
+          div.dataset.pageNum = i;
+          div.style.width = Math.floor(viewport.width) + "px";
+          div.style.height = Math.floor(viewport.height) + "px";
+          
+          wrapper.appendChild(div);
+          observer.observe(div);
+        }
+
+        // Restore scroll
+        if (prevScroll > 0) {
+           setTimeout(() => {
+             container.scrollTop = prevScroll * container.scrollHeight;
+           }, 50);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // 4. Render Content
+    async function renderPageContent(div) {
+      div.dataset.rendered = "true";
+      const num = parseInt(div.dataset.pageNum);
       
-      // Create page container
-      const div = document.createElement("div");
-      div.className = "page";
+      const page = await pdfDoc.getPage(num);
+      const viewport = page.getViewport({scale: scale});
+      
+      // Update div size if page size differs from P1 assumption
       div.style.width = Math.floor(viewport.width) + "px";
       div.style.height = Math.floor(viewport.height) + "px";
-      div.style.position = "relative"; // vital for textLayer
-      
+
       // Canvas
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext('2d');
-      canvas.height = viewport.height;
       canvas.width = viewport.width;
-      canvas.className = "rp-canvas";
-      
+      canvas.height = viewport.height;
       div.appendChild(canvas);
-      
-      // Render PDF to canvas
-      const renderContext = {
-        canvasContext: ctx,
-        viewport: viewport
-      };
-      await page.render(renderContext).promise;
-      
+
+      const renderCtx = { canvasContext: ctx, viewport: viewport };
+      await page.render(renderCtx).promise;
+
       // Text Layer
-      const textLayerDiv = document.createElement("div");
-      textLayerDiv.className = "textLayer";
-      textLayerDiv.style.width = Math.floor(viewport.width) + "px";
-      textLayerDiv.style.height = Math.floor(viewport.height) + "px";
-      div.appendChild(textLayerDiv);
+      const textDiv = document.createElement("div");
+      textDiv.className = "textLayer";
+      div.appendChild(textDiv);
       
       const textContent = await page.getTextContent();
       pdfjsLib.renderTextLayer({
         textContentSource: textContent,
-        container: textLayerDiv,
+        container: textDiv,
         viewport: viewport,
         textDivs: []
       });
-
-      wrapper.appendChild(div);
-      
-      // Move to next page
-      if (pageNum < pdfDoc.numPages) {
-        pageNum++;
-        renderPage(pageNum);
-      }
     }
 
-    // Load PDF
-    pdfjsLib.getDocument(url).promise.then(doc => {
-      pdfDoc = doc;
-      renderPage(1);
-    });
-    
+    // 5. Controls
     document.getElementById('zoom-in').onclick = () => {
-        scale += 0.2;
-        wrapper.innerHTML = "";
-        pageNum = 1;
-        renderPage(1);
+      isFitToWidth = false;
+      scale *= 1.2;
+      init();
     };
     
     document.getElementById('zoom-out').onclick = () => {
-        scale = Math.max(0.5, scale - 0.2);
-        wrapper.innerHTML = "";
-        pageNum = 1;
-        renderPage(1);
+      isFitToWidth = false;
+      scale /= 1.2;
+      init();
     };
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      if(isFitToWidth) {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(init, 200);
+      }
+    });
+
+    // Start
+    init();
   </script>
 </body>
 </html>

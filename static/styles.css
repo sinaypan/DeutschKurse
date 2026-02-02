@@ -30,6 +30,19 @@
   --radius-sm: 8px;
 }
 
+/* Highlighting for better visibility */
+::selection {
+  background: rgba(59, 130, 246, 0.4); /* Blue accent with transparency */
+  color: #fff;
+  text-shadow: none;
+}
+
+/* Specific fix for PDF.js text layer selection */
+.textLayer ::selection {
+  background: rgba(59, 130, 246, 0.4);
+  color: transparent; /* PDF.js text is transparent, keep it that way */
+}
+
 html,
 body {
   height: 100%;
